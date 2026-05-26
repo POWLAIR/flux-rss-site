@@ -1,0 +1,46 @@
+---
+interface Props {
+  tags: string[];
+  sources: string[];
+}
+
+const { tags, sources } = Astro.props;
+---
+
+<div class="filter-bar" id="filter-bar">
+  <input
+    type="search"
+    id="search-input"
+    class="filter-bar__search"
+    placeholder="Rechercher un article..."
+    autocomplete="off"
+  />
+
+  <div class="filter-bar__group">
+    <span class="filter-bar__label">Tags</span>
+    {tags.map(tag => (
+      <button
+        class="pill"
+        data-filter-type="tag"
+        data-filter-value={tag}
+        type="button"
+      >
+        {tag}
+      </button>
+    ))}
+  </div>
+
+  <div class="filter-bar__group">
+    <span class="filter-bar__label">Sources</span>
+    {sources.map(source => (
+      <button
+        class="pill"
+        data-filter-type="source"
+        data-filter-value={source}
+        type="button"
+      >
+        {source}
+      </button>
+    ))}
+  </div>
+</div>

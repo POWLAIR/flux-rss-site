@@ -1,0 +1,181 @@
+---
+import '../styles/global.css';
+import ArticleCard from '../components/ArticleCard.astro';
+import FilterBar from '../components/FilterBar.astro';
+
+const FEED_URL = 'https://powlair.github.io/flux-rss-enricher/feed-enriched.json';
+
+interface Article {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  date: string;
+  author: string;
+  tags: string[];
+  signal: number;
+  lang: string;
+}
+
+interface FeedMeta {
+  generatedAt: string;
+  totalArticles: number;
+  uniqueSources: number;
+  availableTags: string[];
+}
+
+interface Feed {
+  meta: FeedMeta;
+  articles: Article[];
+}
+
+let feed: Feed | null = null;
+let error: string | null = null;
+
+try {
+  const res = await fetch(FEED_URL);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  feed = await res.json();
+} catch (e: any) {
+  error = e.message;
+}
+
+const articles = feed?.articles ?? [];
+const meta = feed?.meta;
+
+const sources = [...new Set(articles.map(a => a.source))].sort();
+const tags = meta?.availableTags ?? [];
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+---
+
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veille Tech — Flux RSS</title>
+    <meta name="description" content="Agrégateur de veille technologique JavaScript & Frontend" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <div class="site-header__inner">
+          <span class="site-header__title">Veille Tech</span>
+          {meta && (
+            <span class="site-header__meta">
+              {meta.totalArticles} articles · {meta.uniqueSources} sources
+              · mis à jour {formatDate(meta.generatedAt)}
+            </span>
+          )}
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      {error ? (
+        <p class="empty-state">Impossible de charger le feed : {error}</p>
+      ) : (
+        <>
+          <FilterBar tags={tags} sources={sources} />
+
+          <div class="article-grid" id="article-grid">
+            {articles.map(article => (
+              <ArticleCard
+                id={article.id}
+                title={article.title}
+                source={article.source}
+                url={article.url}
+                date={article.date}
+                author={article.author}
+                tags={article.tags}
+                signal={article.signal}
+              />
+            ))}
+          </div>
+
+          <p class="empty-state" id="no-results" style="display:none">
+            Aucun article ne correspond à ces filtres.
+          </p>
+        </>
+      )}
+    </main>
+
+    <script>
+      // ── State ──────────────────────────────────────────────
+      let activeTag: string | null = null;
+      let activeSource: string | null = null;
+      let searchQuery = '';
+
+      const grid = document.getElementById('article-grid')!;
+      const noResults = document.getElementById('no-results')!;
+      const searchInput = document.getElementById('search-input') as HTMLInputElement;
+      const pills = document.querySelectorAll<HTMLButtonElement>('.pill');
+      const cards = document.querySelectorAll<HTMLElement>('.card');
+
+      // ── Filter logic ────────────────────────────────────────
+      function applyFilters() {
+        let visible = 0;
+
+        cards.forEach(card => {
+          const cardSource = card.dataset.source ?? '';
+          const cardTags = (card.dataset.tags ?? '').split(',').filter(Boolean);
+          const cardTitle = card.dataset.title ?? '';
+
+          const matchTag    = !activeTag    || cardTags.includes(activeTag);
+          const matchSource = !activeSource || cardSource === activeSource;
+          const matchSearch = !searchQuery  || cardTitle.includes(searchQuery);
+
+          const show = matchTag && matchSource && matchSearch;
+          card.style.display = show ? '' : 'none';
+          if (show) visible++;
+        });
+
+        noResults.style.display = visible === 0 ? '' : 'none';
+      }
+
+      // ── Pill clicks ─────────────────────────────────────────
+      pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          const type  = pill.dataset.filterType!;
+          const value = pill.dataset.filterValue!;
+
+          if (type === 'tag') {
+            if (activeTag === value) {
+              activeTag = null;
+              pill.classList.remove('is-active');
+            } else {
+              // Deactivate previous tag pill
+              document.querySelectorAll<HTMLButtonElement>('[data-filter-type="tag"]')
+                .forEach(p => p.classList.remove('is-active'));
+              activeTag = value;
+              pill.classList.add('is-active');
+            }
+          } else {
+            if (activeSource === value) {
+              activeSource = null;
+              pill.classList.remove('is-active');
+            } else {
+              document.querySelectorAll<HTMLButtonElement>('[data-filter-type="source"]')
+                .forEach(p => p.classList.remove('is-active'));
+              activeSource = value;
+              pill.classList.add('is-active');
+            }
+          }
+
+          applyFilters();
+        });
+      });
+
+      // ── Search input ────────────────────────────────────────
+      searchInput.addEventListener('input', () => {
+        searchQuery = searchInput.value.toLowerCase().trim();
+        applyFilters();
+      });
+    </script>
+  </body>
+</html>

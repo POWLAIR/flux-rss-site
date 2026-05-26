@@ -1,0 +1,75 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  date: string;
+  author: string;
+  tags: string[];
+  signal: number;
+}
+
+const { id, title, source, url, date, author, tags, signal } = Astro.props;
+
+// Deterministic color from source name (hue 0–359)
+function sourceHue(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  }
+  return hash % 360;
+}
+
+const hue = sourceHue(source);
+const badgeColor = `hsl(${hue}, 55%, 42%)`;
+
+// Relative date label
+function relativeDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `il y a ${minutes}min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `il y a ${days}j`;
+}
+
+const dateLabel = relativeDate(date);
+const isTrending = signal >= 2;
+---
+
+<article
+  class="card"
+  data-source={source}
+  data-tags={tags.join(',')}
+  data-title={title.toLowerCase()}
+>
+  <div class="card__header">
+    <span class="card__source-badge" style={`background:${badgeColor}`}>
+      {source}
+    </span>
+    {isTrending && (
+      <span class="card__signal" title={`Mentionné dans ${signal} autres articles`}>
+        trending
+      </span>
+    )}
+  </div>
+
+  <a href={url} target="_blank" rel="noopener noreferrer">
+    <h2 class="card__title">{title}</h2>
+  </a>
+
+  <p class="card__meta">
+    {dateLabel}
+    {author && author !== 'Unknown' && <> · {author}</>}
+  </p>
+
+  {tags.length > 0 && (
+    <div class="card__tags">
+      {tags.map(tag => (
+        <span class="card__tag">{tag}</span>
+      ))}
+    </div>
+  )}
+</article>
